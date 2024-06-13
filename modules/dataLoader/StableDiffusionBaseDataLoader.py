@@ -1,4 +1,5 @@
 import os
+import re
 
 import torch
 from mgds.MGDS import TrainDataLoader, MGDS
@@ -144,9 +145,9 @@ class StableDiffusionBaseDataLoader(BaseDataLoader):
         if config.model_type.has_depth_input():
             inputs.append('depth')
 
-        lowest_resolution = min(int(res.strip()) for res in config.resolution.split(','))
-        circular_mask_shrink = RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0, enabled_in_name='settings.enable_random_circular_mask_shrink')
-        random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=lowest_resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20, enabled_in_name='settings.enable_random_mask_rotate_crop')
+        lowest_resolution = min([int(x.strip()) for x in re.split('\D', config.resolution) if x.strip() != ''])
+        circular_mask_shrink = RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0, enabled_in_name='concept.image.enable_random_circular_mask_shrink')
+        random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='mask', additional_names=inputs, min_size=lowest_resolution, min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20, enabled_in_name='concept.image.enable_random_mask_rotate_crop')
 
         modules = []
 
@@ -192,17 +193,17 @@ class StableDiffusionBaseDataLoader(BaseDataLoader):
         return modules
 
     def _crop_modules(self, config: TrainConfig):
-        scale_crop_image = ScaleCropImage(image_in_name='image', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.enable_crop_jitter', image_out_name='image', crop_offset_out_name='crop_offset')
-        scale_crop_mask = ScaleCropImage(image_in_name='mask', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.enable_crop_jitter', image_out_name='mask', crop_offset_out_name='crop_offset')
-        scale_crop_depth = ScaleCropImage(image_in_name='depth', scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.enable_crop_jitter', image_out_name='depth', crop_offset_out_name='crop_offset')
-
-        modules = [scale_crop_image]
+        inputs = ['image']
 
         if config.masked_training or config.model_type.has_mask_input():
-            modules.append(scale_crop_mask)
+            inputs.append('mask')
 
         if config.model_type.has_depth_input():
-            modules.append(scale_crop_depth)
+            inputs.append('depth')
+
+        scale_crop = ScaleCropImage(names=inputs, scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.image.enable_crop_jitter', crop_offset_out_name='crop_offset')
+
+        modules = [scale_crop]
 
         return modules
 
