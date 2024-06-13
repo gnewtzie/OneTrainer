@@ -1,5 +1,5 @@
-import json
 import os
+import re
 
 import torch
 from mgds.MGDS import TrainDataLoader, MGDS
@@ -111,11 +111,11 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
     def __mask_augmentation_modules(self, config: TrainConfig) -> list:
         inputs = ['image']
 
-        lowest_resolution = min(int(res.strip()) for res in config.resolution.split(','))
+        lowest_resolution = min([int(x.strip()) for x in re.split('\D', config.resolution) if x.strip() != ''])
 
         random_mask_rotate_crop = RandomMaskRotateCrop(mask_name='latent_mask', additional_names=inputs, min_size=lowest_resolution,
                                                        min_padding_percent=10, max_padding_percent=30, max_rotate_angle=20,
-                                                       enabled_in_name='settings.enable_random_circular_mask_shrink')
+                                                       enabled_in_name='concept.image.enable_random_circular_mask_shrink')
 
         modules = []
 
@@ -160,19 +160,14 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
 
     def __crop_modules(self, config: TrainConfig):
-        scale_crop_image = ScaleCropImage(image_in_name='image', scale_resolution_in_name='scale_resolution',
-                                          crop_resolution_in_name='crop_resolution',
-                                          enable_crop_jitter_in_name='concept.enable_crop_jitter',
-                                          image_out_name='image', crop_offset_out_name='crop_offset')
-        scale_crop_mask = ScaleCropImage(image_in_name='latent_mask', scale_resolution_in_name='scale_resolution',
-                                         crop_resolution_in_name='crop_resolution',
-                                         enable_crop_jitter_in_name='concept.enable_crop_jitter',
-                                         image_out_name='latent_mask', crop_offset_out_name='crop_offset')
-
-        modules = [scale_crop_image]
+        inputs = ['image']
 
         if config.masked_training:
-            modules.append(scale_crop_mask)
+            inputs.append('latent_mask')
+
+        scale_crop = ScaleCropImage(names=inputs, scale_resolution_in_name='scale_resolution', crop_resolution_in_name='crop_resolution', enable_crop_jitter_in_name='concept.image.enable_crop_jitter', crop_offset_out_name='crop_offset')
+
+        modules = [scale_crop]
 
         return modules
 
